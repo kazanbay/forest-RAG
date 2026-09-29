@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any
-from sqlalchemy import Boolean, Integer, String, Text, DateTime, JSON, func
+from sqlalchemy import Boolean, Integer, String, Text, DateTime, JSON, ForeignKey, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from src.db.session import Base
 
@@ -24,6 +25,23 @@ class RawDocument(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class DocChunk(Base):
+    __tablename__ = "doc_chunks"
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index", name="uq_doc_chunks_document_index"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("raw_documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 class FeedbackLog(Base):
