@@ -17,12 +17,12 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from src.db.models import DocChunk, RawDocument
 from src.db.session import AsyncSessionLocal, engine
+from src.rag.embedding import DEVICE, load_bge_model
 
 
 COLLECTION_NAME = "notion_chunks"
-MODEL_NAME = "BAAI/bge-m3"
 VECTOR_SIZE = 1024
-BATCH_SIZE = 32
+BATCH_SIZE = 4
 
 
 async def load_chunks() -> list[tuple[int, int, str, dict[str, Any], str]]:
@@ -56,9 +56,6 @@ def index_chunks(
     chunks: list[tuple[int, int, str, dict[str, Any], str]], *, recreate: bool = False
 ) -> int:
     from qdrant_client import QdrantClient, models
-    import torch
-    from sentence_transformers import SentenceTransformer
-
     qdrant_url = os.getenv("QDRANT_URL")
     api_key = os.getenv("QDRANT_API_KEY")
     if not qdrant_url:
@@ -70,10 +67,6 @@ def index_chunks(
 
     client = QdrantClient(url=qdrant_url, api_key=api_key, timeout=120)
     try:
-        if hasattr(torch, "set_num_threads"):
-            torch.set_num_threads(max(1, min(12, os.cpu_count() or 1)))
-            torch.set_num_interop_threads(1)
-
         collection_exists = client.collection_exists(COLLECTION_NAME)
         if recreate and collection_exists:
             client.delete_collection(COLLECTION_NAME)
@@ -121,7 +114,8 @@ def index_chunks(
             print(f"Vectors in {COLLECTION_NAME}: {total}")
             return total
 
-        model = SentenceTransformer(MODEL_NAME, device="cpu")
+        model = load_bge_model()
+        print(f"Encoding batches of {BATCH_SIZE} on {DEVICE}", flush=True)
 
         uploaded = 0
         for batch in _batches(pending_chunks, BATCH_SIZE):

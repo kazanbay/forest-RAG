@@ -1,7 +1,7 @@
 [project]
 name = "forest"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.31.0",
     "asyncpg>=0.31.0",
@@ -16,6 +16,7 @@ dependencies = [
     "sentence-transformers>=6.1.0",
     "sqlalchemy>=2.1.1",
     "transformers>=5.17.0",
+    "torch==2.5.1",
 ]
 
 [tool.pytest.ini_options]
@@ -25,3 +26,12 @@ pythonpath = ["src"]
 dev = [
     "pytest>=9.1.1",
 ]
+
+# --- НАСТРОЙКА CUDA ДЛЯ UV ---
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
