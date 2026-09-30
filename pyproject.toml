@@ -13,10 +13,10 @@ dependencies = [
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
     "qdrant-client[fastembed]>=1.19.1",
-    "sentence-transformers>=6.1.0",
+    "sentence-transformers>=5.1.2,<6",
     "sqlalchemy>=2.1.1",
-    "transformers>=5.17.0",
-    "torch==2.5.1",
+    "transformers>=4.41,<5",
+    "torch==2.6.0",
 ]
 
 [tool.pytest.ini_options]
@@ -29,9 +29,9 @@ dev = [
 
 # --- НАСТРОЙКА CUDA ДЛЯ UV ---
 [[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu121" }
+torch = { index = "pytorch-cu124" }

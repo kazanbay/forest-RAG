@@ -32,5 +32,10 @@ def load_bge_model():
     from sentence_transformers import SentenceTransformer
 
     print(f"Loading {MODEL_NAME} on {DEVICE}", flush=True)
-    model_kwargs = {"torch_dtype": torch.float16} if DEVICE == "cuda" else {}
+
+    # BGE-M3's repository provides PyTorch bin weights, so don't require safetensors.
+    model_kwargs = {"use_safetensors": False}
+    if DEVICE == "cuda":
+        model_kwargs["torch_dtype"] = torch.float16
+
     return SentenceTransformer(MODEL_NAME, device=DEVICE, model_kwargs=model_kwargs)
