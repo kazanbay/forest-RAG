@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from typing import Any
+
 import torch
 
 MODEL_NAME = "BAAI/bge-m3"
@@ -34,7 +36,7 @@ def load_bge_model():
     print(f"Loading {MODEL_NAME} on {DEVICE}", flush=True)
 
     # BGE-M3's repository provides PyTorch bin weights, so don't require safetensors.
-    model_kwargs = {"use_safetensors": False}
+    model_kwargs: dict[str, Any] = {"use_safetensors": False}
     if DEVICE == "cuda":
         model_kwargs["torch_dtype"] = torch.float16
 
