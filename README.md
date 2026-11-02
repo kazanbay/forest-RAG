@@ -1,135 +1,147 @@
-# Idite Lesom — база знаний и Telegram-бот
+# Idite Lesom — Knowledge Base & Telegram Assistant
 
-Проект собирает материалы сайта «Идите Лесом», сохраняет их в PostgreSQL, разбивает на фрагменты, индексирует в Qdrant и отвечает на вопросы через Telegram. Для поиска используется эмбеддинг-модель **BAAI/bge-m3**, а ответы генерируются через OpenRouter. Бот старается отвечать по найденным материалам базы знаний.
+[Русская версия](README.ru.md)
 
-## Как устроен проект
+Idite Lesom is a retrieval-augmented generation (RAG) project that collects public knowledge base pages, indexes their content, and answers questions in Telegram. The pipeline combines a website scraper, PostgreSQL, Qdrant vector search, **BAAI/bge-m3** embeddings, and answer generation through OpenRouter.
+
+This repository is a practical example of an end-to-end RAG application: data ingestion, content cleanup, token-aware chunking, vector indexing, retrieval, and an async Telegram interface.
+
+## How it works
+
+```text
+Website → PostgreSQL → Cleaned chunks → Qdrant → Top-k retrieval → OpenRouter → Answer
+```
+
+The assistant retrieves up to five relevant chunks for each question and instructs the language model to ground its response in those sources.
+
+## Project structure
 
 ```text
 src/
-  bot.py                 Telegram-бот (aiogram 3)
-  scraper/parser.py      обход сайта и сохранение страниц
-  cleaner/               очистка Markdown
-  chunking/chunker.py    разбиение документов на фрагменты
-  db/                    модели и подключение к PostgreSQL
-  rag/                   эмбеддинги, поиск в Qdrant и генерация ответа
+  bot.py                 Telegram bot (aiogram 3)
+  scraper/parser.py      Website crawler and PostgreSQL ingestion
+  cleaner/               Markdown cleanup for RAG
+  chunking/chunker.py    Header-aware, token-bounded chunking
+  db/                    PostgreSQL models and sessions
+  rag/                   BGE-M3 embeddings, Qdrant retrieval, answer generation
 scripts/
-  create_chunks.py       сборка таблицы doc_chunks
-  index_qdrant.py        загрузка фрагментов в Qdrant
-  query_rag.py           вопрос к RAG из командной строки
-tests/                   тесты
-main.py                  создание таблиц и запуск скрапера
+  create_chunks.py       Build the doc_chunks table
+  index_qdrant.py        Embed and upload chunks to Qdrant
+  query_rag.py           Ask the RAG pipeline from the command line
+tests/                   Automated tests
+main.py                  Initialize database tables and run the scraper
 ```
 
-Путь данных:
+## Technology
 
-```text
-сайт → PostgreSQL (raw_documents) → фрагменты (doc_chunks) → Qdrant → поиск → OpenRouter → ответ
-```
+- Python **3.14** and [uv](https://docs.astral.sh/uv/)
+- [aiogram 3](https://docs.aiogram.dev/en/latest/) for the Telegram bot
+- PostgreSQL and SQLAlchemy for storing scraped documents and chunks
+- [Qdrant](https://qdrant.tech/) for vector search
+- **BAAI/bge-m3** for 1024-dimensional embeddings (CPU)
+- [OpenRouter](https://openrouter.ai/) for grounded answer generation (`openrouter/free` by default)
+- Playwright for crawling web pages
 
-## Требования
+## Requirements
 
-- Python **3.14** (версия указана в `pyproject.toml`)
-- [uv](https://docs.astral.sh/uv/)
-- PostgreSQL
-- Qdrant с доступом по URL и API-ключу
-- API-ключ OpenRouter
-- Telegram-бот, созданный через [@BotFather](https://t.me/BotFather)
+- Python 3.14
+- PostgreSQL database
+- Qdrant instance and API key
+- OpenRouter API key
+- Telegram bot token from [@BotFather](https://t.me/BotFather)
 
-## Установка
+## Setup
+
+Install dependencies and the Chromium browser used by Playwright:
 
 ```bash
 uv sync
 uv run playwright install chromium
 ```
 
-Создайте в корне проекта файл `.env` и заполните нужные значения:
+Create a `.env` file in the repository root:
 
 ```dotenv
-# PostgreSQL, например: postgresql+asyncpg://user:password@localhost:5432/forest
+# PostgreSQL, for example: postgresql+asyncpg://user:password@localhost:5432/forest
 DATABASE_URL=
 
-# Сайт, с которого начинается обход
+# Website entry point for the crawler
 START_URL=https://iditelesombase.org/
 
-# Qdrant Cloud или свой экземпляр
+# Qdrant Cloud or self-hosted instance
 QDRANT_URL=
 QDRANT_API_KEY=
 
-# OpenRouter и Telegram
+# External API credentials
 OPENROUTER_API_KEY=
 TELEGRAM_BOT_TOKEN=
 
-# Необязательно: токен Hugging Face для скачивания модели, если он требуется
+# Optional: Hugging Face token, if required to download the model
 HF_TOKEN=
 ```
 
-Не добавляйте `.env` с секретами в Git.
+Keep credentials private; do not commit your `.env` file.
 
-## Первый запуск: собрать базу знаний
+## Build the knowledge base
 
-Выполняйте шаги по порядку из корня репозитория.
+Run these steps from the repository root, in order.
 
-1. Создать таблицы PostgreSQL и обойти страницы `START_URL`:
+1. Create the PostgreSQL tables and crawl pages starting at `START_URL`:
 
    ```bash
    uv run main.py
    ```
 
-2. Очистить Markdown и пересобрать фрагменты в таблице `doc_chunks`:
+2. Clean stored Markdown and rebuild the `doc_chunks` table:
 
    ```bash
    uv run scripts/migrate_clean_markdown.py
    uv run scripts/create_chunks.py
    ```
 
-3. Загрузить векторы и тексты фрагментов в коллекцию Qdrant `notion_chunks`:
+3. Embed the chunks and upload them to the Qdrant collection `notion_chunks`:
 
    ```bash
    uv run scripts/index_qdrant.py
    ```
 
-   Индексатор добавляет отсутствующие векторы. Флаг `--recreate` удаляет и заново создаёт коллекцию перед индексацией:
+The indexer adds vectors that are not already present. The `--recreate` option deletes and recreates the collection before indexing:
 
-   ```bash
-   uv run scripts/index_qdrant.py --recreate
-   ```
+```bash
+uv run scripts/index_qdrant.py --recreate
+```
 
-   Используйте этот флаг, только если действительно хотите пересоздать коллекцию.
+Use `--recreate` only when you intend to replace the existing collection. After crawling updated pages, repeat steps 1–3 to refresh the database and vector index.
 
-После обновления исходных страниц повторите этапы 1–3, чтобы обновить базу и индекс.
-
-## Запуск бота
+## Run the Telegram bot
 
 ```bash
 uv run src/bot.py
 ```
 
-Бот отвечает на `/start` приветствием и принимает текстовые вопросы. Для каждого вопроса он ищет до пяти фрагментов в Qdrant и передаёт их генератору ответа. Для генерации необходимы доступные PostgreSQL/Qdrant-настройки и `OPENROUTER_API_KEY`; для запуска polling — `TELEGRAM_BOT_TOKEN`.
+Send `/start` for a greeting, then ask a question in text. The bot performs retrieval and answer generation in worker threads so synchronous model and database calls do not block the async event loop. The bot requires `TELEGRAM_BOT_TOKEN`, valid Qdrant settings, and `OPENROUTER_API_KEY`.
 
-## Вопрос из командной строки
-
-Проверить RAG без Telegram можно так:
+## Ask from the command line
 
 ```bash
-uv run scripts/query_rag.py "Как обратиться за помощью?"
+uv run scripts/query_rag.py "How can I get help?"
 ```
 
-Количество найденных фрагментов задаётся параметром `--top-k`:
+Set the number of retrieved chunks with `--top-k`:
 
 ```bash
-uv run scripts/query_rag.py --top-k 3 "Как обратиться за помощью?"
+uv run scripts/query_rag.py --top-k 3 "How can I get help?"
 ```
 
-## Тесты
+## Tests
 
 ```bash
 uv run pytest
 ```
 
-## Детали реализации
+## Implementation notes
 
-- Для эмбеддингов и поиска используется `BAAI/bge-m3`.
-- Фрагменты ограничены примерно 1024 токенами с перекрытием до 128 токенов.
-- Коллекция Qdrant называется `notion_chunks`, размер вектора — 1024.
-- Синхронные вызовы поиска и генерации в Telegram-обработчике запускаются через `asyncio.to_thread`, чтобы не блокировать цикл событий.
-- Генератор использует модель OpenRouter `openrouter/free` по умолчанию. Системная инструкция ограничивает ответы содержимым найденных источников.
+- The Qdrant collection is named `notion_chunks`; vectors have 1024 dimensions.
+- Chunking preserves nearby H2/H3 section context and targets a maximum of 1024 tokens with up to 128 tokens of overlap.
+- The answer generator is instructed to use the retrieved knowledge base context and to say when the context does not contain an answer.
+- The Telegram handler sends generated answers with HTML formatting and falls back to plain text if Telegram rejects the markup.
